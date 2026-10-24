@@ -1,6 +1,7 @@
 import React from 'react';
 import dynamicBar from './assets/dynamic-bar.png';
 import phoneix from './assets/phoneix.png';
+import pyramid from './assets/pyramid.png';
 
 const S_PATH = 'M62 34c-3-7-9-10-16-10-9 0-15 5-15 12 0 17 33 9 33 27 0 8-7 13-17 13-9 0-16-4-19-12';
 
@@ -53,7 +54,7 @@ function Spotlight() {
   );
 }
 
-const IMAGES = { 'dynamic-bar': dynamicBar, phoneix };
+const IMAGES = { 'dynamic-bar': dynamicBar, phoneix, pyramid };
 const SVGS = { sentinel: Sentinel, 'sentinel-business': SentinelBusiness, 'spotlight-clone': Spotlight };
 
 export function AppIcon({ id, name }) {

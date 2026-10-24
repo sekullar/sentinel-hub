@@ -38,6 +38,16 @@
       }
     },
     {
+      "id": "pyramid",
+      "name": "Pyramid",
+      "description": {
+        "tr": "Yapay zeka destekli, tamamen siyah Markdown not defteri.",
+        "en": "An all-black, AI-assisted Markdown notebook."
+      },
+      "repo": "sekullar/pyramid",
+      "stack": "electron"
+    },
+    {
       "id": "sentinel",
       "name": "Sentinel",
       "description": {
