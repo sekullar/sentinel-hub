@@ -36,7 +36,10 @@ launch them from one place. Windows, built with Electron + React. [Türkçe READ
 Download `Sentinel.Hub.Setup.<version>.exe` from the [latest release](../../releases/latest) and run it.
 The installer is not code-signed, so Windows SmartScreen may ask you to confirm ("More info" → "Run anyway").
 
-## Adding an app
+## Adding an app (maintainer notes)
+
+Sentinel Hub only carries apps published by the maintainer; it is not an open store and does not accept third-party apps.
+These are the steps for adding one of the maintainer's own apps:
 
 1. Make sure the app's repo publishes a GitHub Release with a Windows installer named `*Setup*.exe`
    (electron-builder NSIS does this). The installer must support silent install: `/S` and `/D=<folder>`.
@@ -52,7 +55,7 @@ The installer is not code-signed, so Windows SmartScreen may ask you to confirm 
    }
    ```
 
-3. Commit and push. Hubs pick up the new entry the next time they open.
+3. Commit and push to this repo. Hubs pick up the new entry the next time they open.
 
 Optional fields: `extra` (`{ "label": { "tr": "", "en": "" }, "url": "https://..." }`, a link button on the card),
 `license: "required"` with `private: true` (shows a disabled "Buy license" button instead of "Install").

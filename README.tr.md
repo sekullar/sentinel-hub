@@ -37,7 +37,10 @@ başlat. Windows için, Electron + React ile yapıldı. [English README](README.
 [Son sürümden](../../releases/latest) `Sentinel.Hub.Setup.<sürüm>.exe` dosyasını indirip çalıştır.
 Kurulum dosyası kod imzalı değildir; Windows SmartScreen onay isteyebilir ("Daha fazla bilgi" → "Yine de çalıştır").
 
-## Uygulama ekleme
+## Uygulama ekleme (geliştirici notları)
+
+Sentinel Hub yalnızca geliştiricinin yayınladığı uygulamaları taşır; açık bir mağaza değildir, üçüncü taraf uygulama kabul etmez.
+Aşağıdakiler, geliştiricinin kendi uygulamalarından birini kataloğa eklerken izlediği adımlardır:
 
 1. Uygulamanın reposunda, Windows kurulum dosyası `*Setup*.exe` adında bir GitHub Release yayınlandığından emin ol
    (electron-builder NSIS bunu yapar). Kurulum dosyası sessiz kurulumu desteklemeli: `/S` ve `/D=<klasör>`.
@@ -53,7 +56,7 @@ Kurulum dosyası kod imzalı değildir; Windows SmartScreen onay isteyebilir ("D
    }
    ```
 
-3. Commit'le ve push'la. Hub'lar bir sonraki açılışta yeni kaydı görür.
+3. Bu repoya commit'le ve push'la. Hub'lar bir sonraki açılışta yeni kaydı görür.
 
 İsteğe bağlı alanlar: `extra` (`{ "label": { "tr": "", "en": "" }, "url": "https://..." }`, kartta bir bağlantı düğmesi),
 `license: "required"` ve `private: true` ("Kur" yerine pasif bir "Lisans satın al" düğmesi gösterir).
