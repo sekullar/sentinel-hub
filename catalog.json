@@ -1,0 +1,63 @@
+{
+  "apps": [
+    {
+      "id": "spotlight-clone",
+      "name": "Spotlight",
+      "description": {
+        "tr": "Windows için Spotlight tarzı başlatıcı ve dosya arama.",
+        "en": "Spotlight-style launcher and file search for Windows."
+      },
+      "repo": "sekullar/spotlight-for-windows",
+      "stack": "electron"
+    },
+    {
+      "id": "dynamic-bar",
+      "name": "Dynamic Bar",
+      "description": {
+        "tr": "Windows için dinamik üst çubuk.",
+        "en": "A dynamic top bar for Windows."
+      },
+      "repo": "sekullar/dynamic-bar-for-windows",
+      "stack": "electron"
+    },
+    {
+      "id": "phoneix",
+      "name": "Phoneix",
+      "description": {
+        "tr": "Telefon ve bilgisayar arasında köprü (masaüstü uygulaması).",
+        "en": "A bridge between your phone and your PC (desktop app)."
+      },
+      "repo": "sekullar/phoneix",
+      "stack": "electron",
+      "extra": {
+        "label": {
+          "tr": "Telefon uygulamasını indir (APK)",
+          "en": "Download the phone app (APK)"
+        },
+        "url": "https://github.com/sekullar/phoneix/releases/latest/download/Phoneix.apk"
+      }
+    },
+    {
+      "id": "sentinel",
+      "name": "Sentinel",
+      "description": {
+        "tr": "Python tabanlı asistan: GUI, WhatsApp, Gmail.",
+        "en": "Python-based assistant: GUI, WhatsApp, Gmail."
+      },
+      "repo": "sekullar/sentinel",
+      "stack": "python"
+    },
+    {
+      "id": "sentinel-business",
+      "name": "Sentinel Business",
+      "description": {
+        "tr": "İşletmeler için Sentinel.",
+        "en": "Sentinel for businesses."
+      },
+      "repo": "sekullar/sentinelBussiness",
+      "stack": "python",
+      "private": true,
+      "license": "required"
+    }
+  ]
+}

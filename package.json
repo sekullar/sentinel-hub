@@ -1,0 +1,45 @@
+{
+  "name": "sentinel-hub",
+  "version": "0.1.0",
+  "description": "Sentinel uygulamaları için masaüstü uygulama mağazası",
+  "main": "electron/main.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "vite build && electron .",
+    "dist": "vite build && electron-builder",
+    "dist:local": "node scripts/build-local.js"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "vite": "^5.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "build": {
+    "appId": "com.sekullar.sentinelhub",
+    "productName": "Sentinel Hub",
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "catalog.json",
+      "package.json",
+      "build/icon.png"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "directories": {
+      "output": "release"
+    }
+  },
+  "author": "Ahmet Efe Korkmaz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sekullar/sentinel-hub.git"
+  }
+}
