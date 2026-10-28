@@ -174,11 +174,47 @@ function Segmented({ value, options, onChange }) {
   );
 }
 
-function Settings({ t, lang, setLang, theme, setTheme }) {
+function GameList({ games, t, onSave }) {
+  const [text, setText] = useState(games.join(', '));
+  useEffect(() => { setText(games.join(', ')); }, [games]);
+  return (
+    <input
+      className="text-input"
+      value={text}
+      spellCheck={false}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => onSave(text.split(',').map((s) => s.trim()).filter(Boolean))}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      placeholder="VALORANT-Win64-Shipping.exe"
+    />
+  );
+}
+
+function Settings({ t, lang, setLang, theme, setTheme, game }) {
   const [auto, setAuto] = useState({ supported: false, enabled: false });
   useEffect(() => { window.hub.getAutostart().then(setAuto); }, []);
   return (
     <div className="settings">
+      <div className="row">
+        <div><h3>{t.gameMode}</h3><p>{t.gameModeHint}</p></div>
+        <Segmented
+          value={game.status.active ? 'on' : 'off'}
+          onChange={(v) => { if ((v === 'on') !== game.status.active && !game.status.busy) window.hub.toggleGame(); }}
+          options={[{ value: 'on', label: t.on }, { value: 'off', label: t.off }]}
+        />
+      </div>
+      <div className="row">
+        <div><h3>{t.gameAuto}</h3><p>{t.gameAutoHint}</p></div>
+        <Segmented
+          value={game.auto ? 'on' : 'off'}
+          onChange={(v) => game.save({ auto: v === 'on' })}
+          options={[{ value: 'on', label: t.on }, { value: 'off', label: t.off }]}
+        />
+      </div>
+      <div className="row stack">
+        <div><h3>{t.gameList}</h3><p>{t.gameListHint}</p></div>
+        <GameList games={game.games} t={t} onSave={(games) => game.save({ games })} />
+      </div>
       <div className="row">
         <div><h3>{t.autostart}</h3><p>{auto.supported ? t.autostartHint : t.autostartDev}</p></div>
         <Segmented
@@ -221,6 +257,18 @@ function HubUpdateBanner({ hub, t, onApply }) {
   );
 }
 
+function GameBanner({ status, t }) {
+  return (
+    <div className="banner game">
+      <div>
+        <strong>{t.gameBannerOn}</strong>
+        <span>{status.busy ? t.gameBannerBusy : t.gameBannerHint}</span>
+      </div>
+      <button className="btn" disabled={status.busy} onClick={() => window.hub.toggleGame()}>{t.gameBannerOff}</button>
+    </div>
+  );
+}
+
 const NAV = [
   { id: 'store', icon: 'M4 7l1-3h14l1 3M4 7v13h16V7M4 7h16M9 11h6' },
   { id: 'installed', icon: 'M12 3v12m0 0l-4-4m4 4l4-4M5 20h14' },
@@ -239,7 +287,22 @@ export default function App() {
   const [page, setPage] = useState('store');
   const [lang, setLang] = usePref('hub.lang', detectLang());
   const [theme, setTheme] = usePref('hub.theme', detectTheme());
+  const [gameCfg, setGameCfg] = useState({ auto: false, games: [] });
+  const [gameStatus, setGameStatus] = useState({ active: false, busy: false });
   const t = STRINGS[lang];
+
+  useEffect(() => { window.hub.setLang(lang); }, [lang]);
+
+  useEffect(() => {
+    window.hub.getGame().then((g) => { setGameCfg({ auto: g.auto, games: g.games }); setGameStatus(g.status); });
+    return window.hub.onGame(setGameStatus);
+  }, []);
+
+  const game = useMemo(() => ({
+    ...gameCfg,
+    status: gameStatus,
+    save: async (patch) => setGameCfg(await window.hub.setGameCfg(patch)),
+  }), [gameCfg, gameStatus]);
 
   useEffect(() => {
     window.hub.getCatalog().then((c) => setApps(c.apps));
@@ -334,6 +397,7 @@ export default function App() {
         <div className="version">{hub.version && `v${hub.version}`}</div>
       </aside>
       <section key={page} className="page">
+        {gameStatus.active && <GameBanner status={gameStatus} t={t} />}
         {hub.update && <HubUpdateBanner hub={hub} t={t} onApply={async () => {
           setHub((h) => ({ ...h, applying: { stage: 'fetching' } }));
           const res = await window.hub.applyHubUpdate();
@@ -347,7 +411,7 @@ export default function App() {
         {page === 'store' && <Store apps={apps} t={t} lang={lang} ctl={ctl} />}
         {page === 'installed' && <Installed apps={apps} t={t} lang={lang} ctl={ctl} />}
         {page === 'settings' && (
-          <Settings t={t} lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} />
+          <Settings t={t} lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} game={game} />
         )}
       </section>
       {settingsFor && installed[settingsFor] && (

@@ -148,3 +148,10 @@ body { overflow: hidden; }
 .banner strong { display: block; font-size: 14px; }
 .banner span { font-size: 12px; color: var(--muted); }
 .banner .btn { flex: none; background: linear-gradient(135deg, #2fd4a7, #3b8bff); }
+
+/* game mode */
+.row.stack { flex-direction: column; align-items: stretch; gap: 12px; }
+.text-input { padding: 11px 14px; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in srgb, var(--text) 5%, transparent); color: var(--text); font: inherit; font-size: 13px; outline: 0; }
+.text-input:focus { border-color: var(--accent); }
+.banner.game { border-color: color-mix(in srgb, #ff8a3d 50%, var(--line)); background: color-mix(in srgb, #ff8a3d 10%, var(--card)); }
+.banner.game .btn { background: linear-gradient(135deg, #ff8a3d, #ff5b6e); }

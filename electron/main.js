@@ -1,10 +1,19 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } = require('electron');
 const { spawn, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { loadCatalog, refreshCatalog } = require('./catalog');
 const { latestRelease, download, isNewer } = require('./github');
 const { checkHubUpdate, applyHubUpdate } = require('./hubUpdate');
+const { createGameMode, DEFAULT_GAMES } = require('./gameMode');
+
+// The Hub lives in the tray: closing the window only hides it, so game mode and auto-detection keep working.
+const LOGIN_ARGS = ['--hidden'];
+const startHidden = process.argv.includes('--hidden');
+let win = null;
+let tray = null;
+let quitting = false;
+let game = null;
 
 const APPS_DIR = path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'SentinelHub', 'apps');
 const stateFile = () => path.join(app.getPath('userData'), 'state.json');
@@ -191,8 +200,53 @@ async function updateApp(id, send) {
   }
 }
 
-function createWindow() {
-  const win = new BrowserWindow({
+const hubState = () => readState().hub || {};
+const patchHub = (patch) => {
+  const state = readState();
+  state.hub = { ...(state.hub || {}), ...patch };
+  writeState(state);
+};
+const gameCfg = () => {
+  const h = hubState();
+  return { auto: !!h.gameAuto, games: Array.isArray(h.gameList) ? h.gameList : DEFAULT_GAMES };
+};
+const hubLang = () => hubState().lang || (app.getLocale().startsWith('tr') ? 'tr' : 'en');
+
+const TRAY_TEXT = {
+  tr: { open: "Sentinel Hub'ı aç", game: 'Oyun modu', quit: 'Çık', tipOn: 'Sentinel Hub · Oyun modu açık', tipOff: 'Sentinel Hub' },
+  en: { open: 'Open Sentinel Hub', game: 'Game mode', quit: 'Quit', tipOn: 'Sentinel Hub · Game mode on', tipOff: 'Sentinel Hub' },
+};
+
+function showWindow() {
+  if (!win || win.isDestroyed()) win = createWindow(true);
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+function refreshTray() {
+  if (!tray) return;
+  const s = TRAY_TEXT[hubLang()] || TRAY_TEXT.en;
+  const st = game ? game.status() : { active: false, busy: false };
+  tray.setToolTip(st.active ? s.tipOn : s.tipOff);
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: s.open, click: showWindow },
+    { label: s.game, type: 'checkbox', checked: st.active, enabled: !st.busy, click: () => game.toggle() },
+    { type: 'separator' },
+    { label: s.quit, click: () => app.quit() },
+  ]));
+}
+
+function createTray() {
+  const icon = nativeImage.createFromPath(path.join(__dirname, '..', 'build', 'icon.png')).resize({ width: 16, height: 16 });
+  tray = new Tray(icon);
+  tray.on('click', showWindow);
+  refreshTray();
+}
+
+function createWindow(show = true) {
+  const w = new BrowserWindow({
+    show,
     width: 1000,
     height: 680,
     minWidth: 720,
@@ -206,18 +260,32 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
-  win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
-  return win;
+  w.on('close', (e) => {
+    if (quitting) return;
+    e.preventDefault();
+    w.hide();
+  });
+  w.on('closed', () => { if (win === w) win = null; });
+  w.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  return w;
 }
 
+const loginOn = () => app.getLoginItemSettings({ args: LOGIN_ARGS }).openAtLogin;
+
 // Hub starts with Windows by default (set once on first run); the user can turn it off in Settings.
+// It starts hidden in the tray ("--hidden"); an older entry without that flag is upgraded once.
 function initAutostart() {
   if (!app.isPackaged) return;
   const state = readState();
   if (!state.hub) state.hub = {};
   if (!state.hub.autostartInit) {
-    app.setLoginItemSettings({ openAtLogin: true });
+    app.setLoginItemSettings({ openAtLogin: true, args: LOGIN_ARGS });
     state.hub.autostartInit = true;
+    state.hub.autostartHidden = true;
+    writeState(state);
+  } else if (!state.hub.autostartHidden) {
+    if (app.getLoginItemSettings().openAtLogin) app.setLoginItemSettings({ openAtLogin: true, args: LOGIN_ARGS });
+    state.hub.autostartHidden = true;
     writeState(state);
   }
 }
@@ -230,18 +298,63 @@ const reply = (fn) => async (_event, ...args) => {
   }
 };
 
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) app.quit();
+else app.on('second-instance', showWindow);
+
+let restored = false;
+app.on('before-quit', (e) => {
+  quitting = true;
+  // Never leave the user's apps closed: bring them back before the Hub exits.
+  if (game && game.status().active && !restored) {
+    e.preventDefault();
+    restored = true;
+    game.exit().finally(() => app.quit());
+  }
+});
+
 app.whenReady().then(() => {
+  if (!gotLock) return;
   initAutostart();
-  const win = createWindow();
-  const send = (payload) => win.webContents.send('install:progress', payload);
+  win = createWindow(!startHidden);
+  const send = (payload) => { if (win && !win.isDestroyed()) win.webContents.send('install:progress', payload); };
+
+  game = createGameMode({
+    installed: () => Object.fromEntries(Object.entries(readState().apps).map(([id, info]) => [id, info.exe])),
+    getCfg: gameCfg,
+    loadClosed: () => hubState().gameClosed || [],
+    saveClosed: (ids) => patchHub({ gameClosed: ids }),
+    launch: launchApp,
+    onChange: (status) => {
+      refreshTray();
+      if (win && !win.isDestroyed()) win.webContents.send('game:changed', status);
+    },
+  });
+  createTray();
+  game.init();
 
   ipcMain.handle('hub:info', () => ({ version: app.getVersion(), packaged: app.isPackaged }));
   ipcMain.handle('hub:checkUpdate', () => checkHubUpdate());
   ipcMain.handle('hub:applyUpdate', reply(async () => { await applyHubUpdate(send); return {}; }));
-  ipcMain.handle('hub:getAutostart', () => ({ supported: app.isPackaged, enabled: app.getLoginItemSettings().openAtLogin }));
+  ipcMain.handle('hub:getAutostart', () => ({ supported: app.isPackaged, enabled: loginOn() }));
   ipcMain.handle('hub:setAutostart', (_e, enabled) => {
-    if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!enabled });
-    return { supported: app.isPackaged, enabled: app.getLoginItemSettings().openAtLogin };
+    if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!enabled, args: LOGIN_ARGS });
+    return { supported: app.isPackaged, enabled: loginOn() };
+  });
+
+  ipcMain.handle('game:get', () => ({ ...gameCfg(), status: game.status() }));
+  ipcMain.handle('game:toggle', () => game.toggle());
+  ipcMain.handle('game:setCfg', (_e, cfg) => {
+    const patch = {};
+    if (typeof cfg.auto === 'boolean') patch.gameAuto = cfg.auto;
+    if (Array.isArray(cfg.games)) {
+      patch.gameList = cfg.games.map((g) => String(g).trim()).filter((g) => /^[\w .()+-]{1,80}\.exe$/i.test(g)).slice(0, 30);
+    }
+    patchHub(patch);
+    return gameCfg();
+  });
+  ipcMain.on('hub:setLang', (_e, lang) => {
+    if (lang === 'tr' || lang === 'en') { patchHub({ lang }); refreshTray(); }
   });
 
   ipcMain.handle('catalog:get', () => refreshCatalog());
@@ -258,5 +371,3 @@ app.whenReady().then(() => {
     if (url && url.startsWith('https://')) shell.openExternal(url);
   });
 });
-
-app.on('window-all-closed', () => app.quit());

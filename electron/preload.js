@@ -15,6 +15,15 @@ contextBridge.exposeInMainWorld('hub', {
   checkHubUpdate: () => ipcRenderer.invoke('hub:checkUpdate'),
   applyHubUpdate: () => ipcRenderer.invoke('hub:applyUpdate'),
   launch: (id) => ipcRenderer.invoke('app:launch', id),
+  getGame: () => ipcRenderer.invoke('game:get'),
+  toggleGame: () => ipcRenderer.invoke('game:toggle'),
+  setGameCfg: (cfg) => ipcRenderer.invoke('game:setCfg', cfg),
+  setLang: (lang) => ipcRenderer.send('hub:setLang', lang),
+  onGame: (cb) => {
+    const handler = (_e, status) => cb(status);
+    ipcRenderer.on('game:changed', handler);
+    return () => ipcRenderer.removeListener('game:changed', handler);
+  },
   onProgress: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on('install:progress', handler);
