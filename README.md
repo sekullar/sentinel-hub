@@ -28,6 +28,7 @@ launch them from one place. Windows, built with Electron + React. [Türkçe READ
 | Spotlight | [sekullar/spotlight-for-windows](https://github.com/sekullar/spotlight-for-windows) |
 | Dynamic Bar | [sekullar/dynamic-bar-for-windows](https://github.com/sekullar/dynamic-bar-for-windows) |
 | Phoneix | [sekullar/phoneix](https://github.com/sekullar/phoneix) |
+| Pyramid | [sekullar/pyramid](https://github.com/sekullar/pyramid) |
 | Sentinel | coming soon |
 | Sentinel Business | licensed (coming soon) |
 

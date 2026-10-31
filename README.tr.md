@@ -29,6 +29,7 @@ başlat. Windows için, Electron + React ile yapıldı. [English README](README.
 | Spotlight | [sekullar/spotlight-for-windows](https://github.com/sekullar/spotlight-for-windows) |
 | Dynamic Bar | [sekullar/dynamic-bar-for-windows](https://github.com/sekullar/dynamic-bar-for-windows) |
 | Phoneix | [sekullar/phoneix](https://github.com/sekullar/phoneix) |
+| Pyramid | [sekullar/pyramid](https://github.com/sekullar/pyramid) |
 | Sentinel | yakında |
 | Sentinel Business | lisanslı (yakında) |
 

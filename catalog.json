@@ -45,7 +45,14 @@
         "en": "An all-black, AI-assisted Markdown notebook."
       },
       "repo": "sekullar/pyramid",
-      "stack": "electron"
+      "stack": "electron",
+      "extra": {
+        "label": {
+          "tr": "Telefon uygulamasını indir (APK)",
+          "en": "Download the phone app (APK)"
+        },
+        "url": "https://github.com/sekullar/pyramid/releases/latest/download/Pyramid.apk"
+      }
     },
     {
       "id": "sentinel",
