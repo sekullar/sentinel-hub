@@ -362,7 +362,11 @@ app.whenReady().then(() => {
   ipcMain.handle('updates:check', () => checkUpdates());
 
   ipcMain.handle('app:install', reply(async (id) => ({ state: await withStartup(await installApp(id, send)) })));
-  ipcMain.handle('app:update', reply(async (id) => ({ state: await withStartup(await updateApp(id, send)) })));
+  // The Hub carries the install/update logic for every app, so a newer Hub must come first.
+  ipcMain.handle('app:update', reply(async (id) => {
+    if ((await checkHubUpdate()).hasUpdate) throw new Error('HUB_UPDATE_FIRST');
+    return { state: await withStartup(await updateApp(id, send)) };
+  }));
   ipcMain.handle('app:uninstall', reply(async (id) => ({ state: await withStartup(await uninstallApp(id)) })));
   ipcMain.handle('app:startup', reply(async (id, enabled) => ({ state: await setStartup(id, enabled) })));
   ipcMain.handle('app:launch', reply(async (id) => { launchApp(id); return {}; }));

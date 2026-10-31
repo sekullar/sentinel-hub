@@ -13,6 +13,7 @@ function usePref(key, initial) {
 
 function errorText(t, code) {
   if (code === 'NO_RELEASE' || code === 'NO_ASSET') return t.errNoRelease;
+  if (code === 'HUB_UPDATE_FIRST') return t.hubUpdateFirstErr;
   return `${t.errGeneric}: ${code}`;
 }
 
@@ -38,8 +39,8 @@ function AppCard({ app, index, t, lang, ctl }) {
     action = (
       <>
       {update && update.hasUpdate && (
-        <button className="btn update" onClick={() => ctl.update(app.id)}>
-          {t.update} · {update.latest}
+        <button className="btn update" disabled={ctl.hubUpdatePending} title={ctl.hubUpdatePending ? t.hubUpdateFirstErr : undefined} onClick={() => ctl.update(app.id)}>
+          {ctl.hubUpdatePending ? t.hubUpdateFirst : `${t.update} · ${update.latest}`}
         </button>
       )}
       <div className="actions">
@@ -243,16 +244,18 @@ function Settings({ t, lang, setLang, theme, setTheme, game }) {
   );
 }
 
-function HubUpdateBanner({ hub, t, onApply }) {
+// Left bar: shown once a newer Hub exists (found at start or by "Check for updates"). Other apps can only be updated after this.
+function HubUpdateSide({ hub, t, onApply }) {
   const a = hub.applying;
   const pct = a && a.stage === 'downloading' ? a.percent : null;
+  const status = a && a.stage === 'error' ? `${t.errGeneric}: ${a.error}` : a ? `${t[a.stage] || t.fetching}${pct != null ? ` ${pct}%` : ''}` : t.hubUpdateHint;
   return (
-    <div className="banner">
-      <div>
-        <strong>{t.hubUpdate} · {hub.update.latest}</strong>
-        <span>{a && a.stage === 'error' ? `${t.errGeneric}: ${a.error}` : a ? `${t[a.stage] || t.fetching}${pct != null ? ` ${pct}%` : ''}` : t.hubUpdateHint}</span>
-      </div>
-      <button className="btn" disabled={!!a && a.stage !== 'error'} onClick={onApply}>{t.hubUpdateNow}</button>
+    <div className="hub-update">
+      <button className="btn update" disabled={!!a && a.stage !== 'error'} onClick={onApply}>
+        <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0l-4 4m4-4l4 4M5 20h14" /></svg>
+        {t.hubUpdateSide} · {hub.update.latest}
+      </button>
+      <span>{status}</span>
     </div>
   );
 }
@@ -339,11 +342,16 @@ export default function App() {
 
   const refreshUpdates = useCallback(async () => {
     setChecking(true);
-    setUpdates(await window.hub.checkUpdates());
+    const [apps, hubUpdate] = await Promise.all([window.hub.checkUpdates(), window.hub.checkHubUpdate()]);
+    setUpdates(apps);
+    setHub((h) => ({ ...h, update: hubUpdate.hasUpdate ? hubUpdate : null }));
     setChecking(false);
   }, []);
 
+  const hubUpdatePending = !!hub.update;
+
   const ctl = useMemo(() => ({
+    hubUpdatePending,
     updates,
     checking,
     refreshUpdates,
@@ -377,7 +385,7 @@ export default function App() {
       const res = await window.hub.launch(id);
       if (!res.ok) setErrors((prev) => ({ ...prev, [id]: res.error }));
     },
-  }), [installed, progress, errors, updates, checking, refreshUpdates, finish]);
+  }), [installed, progress, errors, updates, checking, refreshUpdates, finish, hubUpdatePending]);
 
   return (
     <div className="layout">
@@ -394,15 +402,15 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="version">{hub.version && `v${hub.version}`}</div>
-      </aside>
-      <section key={page} className="page">
-        {gameStatus.active && <GameBanner status={gameStatus} t={t} />}
-        {hub.update && <HubUpdateBanner hub={hub} t={t} onApply={async () => {
+        {hub.update && <HubUpdateSide hub={hub} t={t} onApply={async () => {
           setHub((h) => ({ ...h, applying: { stage: 'fetching' } }));
           const res = await window.hub.applyHubUpdate();
           if (!res.ok) setHub((h) => ({ ...h, applying: { stage: 'error', error: res.error } }));
         }} />}
+        <div className="version">{hub.version && `v${hub.version}`}</div>
+      </aside>
+      <section key={page} className="page">
+        {gameStatus.active && <GameBanner status={gameStatus} t={t} />}
         <header>
           <h1>{t[page]}</h1>
           {page === 'store' && <span className="sub">{apps.length} {t.apps}</span>}

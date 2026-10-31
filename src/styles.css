@@ -33,6 +33,11 @@ nav button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; st
 nav button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text); transform: translateX(2px); }
 nav button.on { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 26%, transparent), color-mix(in srgb, var(--accent2) 18%, transparent)); color: var(--text); }
 .version { font-size: 11px; color: var(--muted); padding: 0 10px; }
+.hub-update { display: flex; flex-direction: column; gap: 6px; margin-top: auto; animation: rise .45s ease both; }
+.hub-update .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px 8px; font-size: 12.5px; line-height: 1.25; text-align: left; }
+.hub-update .btn svg { flex: none; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hub-update span { font-size: 11px; color: var(--muted); padding: 0 4px; }
+.btn.update:disabled { opacity: .5; }
 
 .page { flex: 1; padding: 28px 36px; animation: fade .4s ease both; min-width: 0; }
 header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; }
