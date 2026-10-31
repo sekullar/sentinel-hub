@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } = require('electron');
 const { spawn, execFile } = require('child_process');
-const fs = require('fs');
+// original-fs, not fs: Electron's asar-aware fs opens every app.asar it walks past (the installed Electron apps have one)
+// and keeps it locked, which made updating or removing an app fail with ENOTEMPTY.
+const fs = require('original-fs');
 const path = require('path');
 const { loadCatalog, refreshCatalog } = require('./catalog');
 const { latestRelease, download, isNewer } = require('./github');
