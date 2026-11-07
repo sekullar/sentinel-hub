@@ -29,6 +29,7 @@ launch them from one place. Windows, built with Electron + React. [Türkçe READ
 | Dynamic Bar | [sekullar/dynamic-bar-for-windows](https://github.com/sekullar/dynamic-bar-for-windows) |
 | Phoneix | [sekullar/phoneix](https://github.com/sekullar/phoneix) |
 | Pyramid | [sekullar/pyramid](https://github.com/sekullar/pyramid) |
+| AIDA | [sekullar/aida](https://github.com/sekullar/aida) |
 | Sentinel | coming soon |
 | Sentinel Business | licensed (coming soon) |
 

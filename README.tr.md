@@ -30,6 +30,7 @@ başlat. Windows için, Electron + React ile yapıldı. [English README](README.
 | Dynamic Bar | [sekullar/dynamic-bar-for-windows](https://github.com/sekullar/dynamic-bar-for-windows) |
 | Phoneix | [sekullar/phoneix](https://github.com/sekullar/phoneix) |
 | Pyramid | [sekullar/pyramid](https://github.com/sekullar/pyramid) |
+| AIDA | [sekullar/aida](https://github.com/sekullar/aida) |
 | Sentinel | yakında |
 | Sentinel Business | lisanslı (yakında) |
 

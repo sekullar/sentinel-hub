@@ -55,6 +55,16 @@
       }
     },
     {
+      "id": "aida",
+      "name": "AIDA",
+      "description": {
+        "tr": "ChatGPT, Gemini, Claude ve diğer yapay zekaları API anahtarı olmadan aynı yuvarlak masada tartıştırır.",
+        "en": "Seats ChatGPT, Gemini, Claude and other AIs around one round table to debate, with no API keys."
+      },
+      "repo": "sekullar/aida",
+      "stack": "electron"
+    },
+    {
       "id": "sentinel",
       "name": "Sentinel",
       "description": {
