@@ -14,6 +14,10 @@ function usePref(key, initial) {
 function errorText(t, code) {
   if (code === 'NO_RELEASE' || code === 'NO_ASSET') return t.errNoRelease;
   if (code === 'HUB_UPDATE_FIRST') return t.hubUpdateFirstErr;
+  const known = { LICENSE_REQUIRED: t.errLicenseReq, LICENSE_FORMAT: t.errLicenseFormat, LICENSE_NETWORK: t.errLicenseNet, LICENSE_RATE: t.errLicenseRate, CHECKSUM: t.errChecksum, OLLAMA_START: t.errOllama };
+  if (known[code]) return known[code];
+  if (/^LICENSE: /.test(code)) return code.slice(9);
+  if (/^MODEL_PULL/.test(code)) return `${t.errModel}: ${code.slice(12)}`;
   return `${t.errGeneric}: ${code}`;
 }
 
@@ -25,14 +29,12 @@ function AppCard({ app, index, t, lang, ctl }) {
   const update = ctl.updates[app.id];
 
   let action;
-  if (locked) {
-    action = <button className="btn locked" disabled>{t.buyLicense}</button>;
-  } else if (busy) {
-    const pct = busy.stage === 'downloading' ? busy.percent : null;
+  if (busy) {
+    const pct = ['downloading', 'ollamaDownload', 'model'].includes(busy.stage) ? busy.percent : null;
     action = (
       <div className="progress">
         <div className="bar"><div className={pct == null ? 'fill indeterminate' : 'fill'} style={pct == null ? undefined : { width: `${pct}%` }} /></div>
-        <span>{t[busy.stage]}{pct != null ? ` ${pct}%` : ''}</span>
+        <span>{t[busy.stage]}{busy.model ? ` ${busy.model}` : ''}{pct != null ? ` ${pct}%` : ''}</span>
       </div>
     );
   } else if (info) {
@@ -52,7 +54,7 @@ function AppCard({ app, index, t, lang, ctl }) {
       </>
     );
   } else {
-    action = <button className="btn" onClick={() => ctl.install(app.id)}>{t.install}</button>;
+    action = <button className="btn" onClick={() => (locked ? ctl.askInstall(app) : ctl.install(app.id))}>{locked ? t.installLicensed : t.install}</button>;
   }
 
   return (
@@ -70,6 +72,99 @@ function AppCard({ app, index, t, lang, ctl }) {
       )}
       {error && <div className="error">{errorText(t, error)}</div>}
       {action}
+    </div>
+  );
+}
+
+// Licensed apps: ask for the license key and which Ollama models to download before anything is installed.
+// Two roles: the main model (chat, analysis, drafts) and the WhatsApp assistant. Any Ollama model name may be typed in.
+const MODEL_RE = /^[a-z0-9][a-z0-9._-]{0,60}(\/[a-z0-9][a-z0-9._-]{0,60})?(:[A-Za-z0-9][A-Za-z0-9._-]{0,40})?$/;
+const CUSTOM = '__custom';
+
+function ModelPicker({ title, list, value, setValue, custom, setCustom, recommendedId, fits, have, disabled, t }) {
+  return (
+    <div className="field">
+      <span>{title}</span>
+      <div className="models">
+        {list.map((m) => (
+          <label key={m.id} className={`model${value === m.id && !disabled ? ' on' : ''}${disabled ? ' off' : ''}`}>
+            <input type="radio" disabled={disabled} checked={value === m.id} onChange={() => setValue(m.id)} />
+            <b>{m.id}</b>
+            <span>{m.sizeGB} GB{have(m.id) ? ` · ${t.alreadyHave}` : ''}</span>
+            {m.id === recommendedId && <em>{t.recommended}</em>}
+            {!fits(m) && <em className="warn">{t.heavy}</em>}
+          </label>
+        ))}
+        <label className={`model${value === CUSTOM && !disabled ? ' on' : ''}${disabled ? ' off' : ''}`}>
+          <input type="radio" disabled={disabled} checked={value === CUSTOM} onChange={() => setValue(CUSTOM)} />
+          <b>{t.otherModel}</b>
+          <input className="model-name" disabled={disabled} value={custom} placeholder="ör. llama3.1:8b" spellCheck="false"
+            onFocus={() => setValue(CUSTOM)} onChange={(e) => { setCustom(e.target.value.trim()); setValue(CUSTOM); }} />
+        </label>
+      </div>
+      {value === CUSTOM && !disabled && (
+        <small className={MODEL_RE.test(custom) ? 'muted' : 'warn-text'}>{MODEL_RE.test(custom) ? t.untested : t.modelNameBad}</small>
+      )}
+    </div>
+  );
+}
+
+function InstallDialog({ app, plan, t, onClose, onGo }) {
+  const o = plan.ollama;
+  const { ramGB, vramGB } = plan.hw;
+  const fits = (m) => ramGB >= m.minRamGB && vramGB >= m.minVramGB;
+  const bySize = o ? [...o.models].sort((a, b) => a.sizeGB - b.sizeGB) : [];
+  // recommended main model: the catalog default when the PC can carry it, otherwise the biggest one that fits
+  const defMain = o ? (o.models.find((m) => m.id === o.defaultMain && fits(m)) || [...bySize].reverse().find((m) => fits(m) && m.id !== o.defaultWa) || bySize[0]).id : null;
+  // WhatsApp model: its own default only next to the default main model; on weaker PCs it shares the main model (one download)
+  const defWa = o ? ((defMain === o.defaultMain && o.models.find((m) => m.id === o.defaultWa && fits(m))) ? o.defaultWa : defMain) : null;
+  const [key, setKey] = useState(plan.key || '');
+  const [mainSel, setMainSel] = useState(defMain);
+  const [mainCustom, setMainCustom] = useState('');
+  const [waSel, setWaSel] = useState(defWa);
+  const [waCustom, setWaCustom] = useState('');
+  const [skip, setSkip] = useState(false);
+  const have = (m) => plan.have.includes(m);
+  const mainName = mainSel === CUSTOM ? mainCustom : mainSel;
+  const waName = waSel === CUSTOM ? waCustom : waSel;
+  const namesOk = [mainName, waName].every((n) => MODEL_RE.test(n || ''));
+  const size = (n) => (o.models.find((m) => m.id === n) || { sizeGB: 0 }).sizeGB;
+  const pulls = o && !skip ? [...new Set([mainName, waName])] : [];
+  const need = pulls.reduce((sum, n) => sum + (have(n) ? 0 : size(n)), 0) + (o && !skip && !have(o.embed) ? o.embedGB : 0);
+  const unknownSize = pulls.some((n) => !have(n) && !o.models.some((m) => m.id === n));
+  const keyOk = /^[A-Za-z0-9]{2,4}(-[A-Za-z0-9]{4}){2,4}$/.test(key.trim());
+  const go = () => onGo({ key: key.trim(), model: skip ? undefined : mainName, waModel: skip ? undefined : waName, models: o && !skip ? [...pulls, o.embed] : [] });
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal wide">
+        <div className="modal-head">
+          <div className="icon small"><AppIcon id={app.id} name={app.name} /></div>
+          <div><h2>{app.name}</h2><p>{t.licenseNeeded}</p></div>
+        </div>
+        <label className="field">
+          <span>{t.licenseKey}</span>
+          <input value={key} placeholder="SB-XXXX-XXXX-XXXX" spellCheck="false" autoFocus onChange={(e) => setKey(e.target.value)} />
+        </label>
+        {o && (
+          <>
+            <small className="muted">{t.pickModel} · {t.hwLine.replace('{ram}', ramGB).replace('{vram}', vramGB ? `${vramGB} GB` : t.noGpu)}</small>
+            <ModelPicker title={t.mainModel} list={bySize} value={mainSel} setValue={setMainSel} custom={mainCustom} setCustom={setMainCustom}
+              recommendedId={defMain} fits={fits} have={have} disabled={skip} t={t} />
+            <ModelPicker title={t.waModel} list={bySize} value={waSel} setValue={setWaSel} custom={waCustom} setCustom={setWaCustom}
+              recommendedId={defWa} fits={fits} have={have} disabled={skip} t={t} />
+            <div className="field">
+              <small className="muted">{t.embedLine.replace('{m}', o.embed).replace('{gb}', o.embedGB)}{have(o.embed) ? ` · ${t.alreadyHave}` : ''}</small>
+              <label className="inline"><input type="checkbox" checked={skip} onChange={(e) => setSkip(e.target.checked)} /> {t.skipModels}</label>
+              {!plan.ollamaRunning && !skip && <small className="muted">{t.ollamaWillInstall}</small>}
+              {unknownSize && !skip && <small className="muted">{t.sizeUnknown}</small>}
+            </div>
+          </>
+        )}
+        <div className="modal-foot">
+          <button className="btn ghost" onClick={onClose}>{t.cancel}</button>
+          <button className="btn" disabled={!keyOk || (o && !skip && !namesOk)} onClick={go}>{t.install}{need ? ` · ${unknownSize ? '≥' : ''}${need.toFixed(1)} GB` : ''}</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -287,6 +382,7 @@ export default function App() {
   const [hub, setHub] = useState({ version: '', update: null, applying: null });
   const [checking, setChecking] = useState(false);
   const [settingsFor, setSettingsFor] = useState(null);
+  const [dlg, setDlg] = useState(null);
   const [page, setPage] = useState('store');
   const [lang, setLang] = usePref('hub.lang', detectLang());
   const [theme, setTheme] = usePref('hub.theme', detectTheme());
@@ -365,10 +461,15 @@ export default function App() {
     installed,
     progress,
     errors,
-    install: async (id) => {
+    install: async (id, opts) => {
       setErrors((prev) => ({ ...prev, [id]: null }));
       setProgress((prev) => ({ ...prev, [id]: { id, stage: 'fetching' } }));
-      finish(id, await window.hub.install(id));
+      finish(id, await window.hub.install(id, opts));
+    },
+    askInstall: async (app) => {
+      const res = await window.hub.plan(app.id);
+      if (res.ok) setDlg({ app, plan: res.plan });
+      else setErrors((prev) => ({ ...prev, [app.id]: res.error }));
     },
     uninstall: async (id) => {
       setProgress((prev) => ({ ...prev, [id]: { id, stage: 'uninstalling' } }));
@@ -422,6 +523,15 @@ export default function App() {
           <Settings t={t} lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} game={game} />
         )}
       </section>
+      {dlg && (
+        <InstallDialog
+          app={dlg.app}
+          plan={dlg.plan}
+          t={t}
+          onClose={() => setDlg(null)}
+          onGo={(opts) => { const id = dlg.app.id; setDlg(null); ctl.install(id, opts); }}
+        />
+      )}
       {settingsFor && installed[settingsFor] && (
         <AppSettingsModal
           app={apps.find((a) => a.id === settingsFor)}

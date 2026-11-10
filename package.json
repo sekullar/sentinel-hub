@@ -1,6 +1,6 @@
 {
   "name": "sentinel-hub",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Sentinel uygulamaları için masaüstü uygulama mağazası",
   "main": "electron/main.js",
   "license": "MIT",

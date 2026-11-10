@@ -84,7 +84,58 @@
       "repo": "sekullar/sentinelBussiness",
       "stack": "python",
       "private": true,
-      "license": "required"
+      "license": "required",
+      "dataDir": "Sentinel Business\\data",
+      "ollama": {
+        "embed": "nomic-embed-text",
+        "embedGB": 0.27,
+        "models": [
+          {
+            "id": "qwen3:4b",
+            "sizeGB": 2.5,
+            "minRamGB": 8,
+            "minVramGB": 0
+          },
+          {
+            "id": "gemma3:4b",
+            "sizeGB": 3.35,
+            "minRamGB": 8,
+            "minVramGB": 0
+          },
+          {
+            "id": "qwen3:8b",
+            "sizeGB": 5.23,
+            "minRamGB": 16,
+            "minVramGB": 6
+          },
+          {
+            "id": "gemma3:12b",
+            "sizeGB": 8.16,
+            "minRamGB": 16,
+            "minVramGB": 8
+          },
+          {
+            "id": "qwen3:14b",
+            "sizeGB": 9.28,
+            "minRamGB": 32,
+            "minVramGB": 12
+          },
+          {
+            "id": "gpt-oss:20b",
+            "sizeGB": 14,
+            "minRamGB": 24,
+            "minVramGB": 0
+          },
+          {
+            "id": "qwen3-coder:30b",
+            "sizeGB": 19,
+            "minRamGB": 32,
+            "minVramGB": 0
+          }
+        ],
+        "defaultMain": "qwen3-coder:30b",
+        "defaultWa": "gpt-oss:20b"
+      }
     }
   ]
 }

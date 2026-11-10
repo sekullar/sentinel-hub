@@ -3,7 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('hub', {
   getCatalog: () => ipcRenderer.invoke('catalog:get'),
   getState: () => ipcRenderer.invoke('state:get'),
-  install: (id) => ipcRenderer.invoke('app:install', id),
+  install: (id, opts) => ipcRenderer.invoke('app:install', id, opts),
+  plan: (id) => ipcRenderer.invoke('app:plan', id),
   uninstall: (id) => ipcRenderer.invoke('app:uninstall', id),
   setStartup: (id, enabled) => ipcRenderer.invoke('app:startup', id, enabled),
   checkUpdates: () => ipcRenderer.invoke('updates:check'),

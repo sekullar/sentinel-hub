@@ -8,6 +8,10 @@ const { loadCatalog, refreshCatalog } = require('./catalog');
 const { latestRelease, download, isNewer } = require('./github');
 const { checkHubUpdate, applyHubUpdate } = require('./hubUpdate');
 const { createGameMode, DEFAULT_GAMES } = require('./gameMode');
+const ollama = require('./ollama');
+const licensing = require('./license');
+const MODEL_RE = /^[a-z0-9][a-z0-9._-]{0,60}(\/[a-z0-9][a-z0-9._-]{0,60})?(:[A-Za-z0-9][A-Za-z0-9._-]{0,40})?$/;
+const crypto = require('crypto');
 
 // The Hub lives in the tray: closing the window only hides it, so game mode and auto-detection keep working.
 const LOGIN_ARGS = ['--hidden'];
@@ -17,6 +21,7 @@ let tray = null;
 let quitting = false;
 let game = null;
 
+const LICENSE_SERVER = 'https://akmhiqugeqxczqrqtxge.supabase.co/functions/v1/license';
 const APPS_DIR = path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'SentinelHub', 'apps');
 const stateFile = () => path.join(app.getPath('userData'), 'state.json');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -72,16 +77,60 @@ function shortcutPath(id) {
 }
 
 // Installs (or replaces) an app. An existing copy is moved aside first and restored if the install fails.
-async function installApp(id, send) {
+const savedKey = (id) => (hubState().licenses || {})[id] || '';
+const licenseUrl = () => LICENSE_SERVER; // fixed on purpose: the (remote) catalog must not be able to redirect license checks
+
+// Where the licensed app picks up its first-run setup (license key + chosen models). Matches SENTINEL_DATA_DIR of the app.
+function setupFile(entry) {
+  const dir = /^[\w ]+([\\/][\w ]+)*$/.test(entry.dataDir || '') ? entry.dataDir : entry.name.replace(/[^\w ]/g, '');
+  return path.join(process.env.LOCALAPPDATA || app.getPath('appData'), ...dir.split(/[\\/]/), 'setup.json');
+}
+
+// opts (licensed apps): { key, models: [name...], model } — key from the dialog, otherwise the saved one.
+async function installApp(id, send, opts = {}) {
   const entry = findApp(id);
-  if (entry.license === 'required') throw new Error('LICENSE_REQUIRED');
+  const licensed = entry.license === 'required';
+  const key = licensed ? (opts.key || savedKey(id)) : '';
+  if (licensed && !key) throw new Error('LICENSE_REQUIRED');
 
   send({ id, stage: 'fetching' });
-  const { version, asset } = await latestRelease(entry.repo);
+  let version, url, name, sha256 = null;
+  if (licensed) {
+    const rel = await licensing.fetchRelease(licenseUrl(entry), key, false);
+    ({ version, url, name, sha256 } = rel);
+  } else {
+    const r = await latestRelease(entry.repo);
+    ({ version } = r);
+    url = r.asset.browser_download_url;
+    name = r.asset.name;
+  }
 
-  const installer = path.join(app.getPath('temp'), `SentinelHub-${id}-${asset.name}`);
+  // Ollama + models first: the app is useless without them, and a failure here must not leave a half-installed app.
+  // only models the catalog offers (the renderer is not trusted to name arbitrary pulls)
+  if (licensed && entry.ollama && opts.models) {
+    // catalog models plus free-typed Ollama names (strict pattern: only registry-style names, never a path or URL)
+    const ok = new Set([entry.ollama.embed, ...entry.ollama.models.map((m) => m.id)]);
+    const allowed = (m) => typeof m === 'string' && (ok.has(m) || MODEL_RE.test(m));
+    opts = { ...opts, models: [...new Set(opts.models.filter(allowed))] };
+    if (!allowed(opts.model) || !opts.models.includes(opts.model)) opts.model = undefined;
+    if (!allowed(opts.waModel) || !opts.models.includes(opts.waModel)) opts.waModel = undefined;
+  }
+  if (licensed && entry.ollama && opts.models && opts.models.length) {
+    await ollama.ensure((p) => send({ id, ...p }), app.getPath('temp'));
+    const have = await ollama.installedModels();
+    for (const m of opts.models.filter((m) => !have.includes(m))) {
+      send({ id, stage: 'model', model: m, percent: 0 });
+      await ollama.pull(m, (percent) => send({ id, stage: 'model', model: m, percent }));
+    }
+  }
+
+  const installer = path.join(app.getPath('temp'), `SentinelHub-${id}-${name}`);
   send({ id, stage: 'downloading', percent: 0 });
-  await download(asset.browser_download_url, installer, (percent) => send({ id, stage: 'downloading', percent }));
+  await download(url, installer, (percent) => send({ id, stage: 'downloading', percent }));
+  if (sha256) {
+    const got = crypto.createHash('sha256').update(fs.readFileSync(installer)).digest('hex');
+    if (got !== sha256.toLowerCase()) { fs.rmSync(installer, { force: true }); throw new Error('CHECKSUM'); }
+  }
 
   const dir = path.join(APPS_DIR, id);
   const backup = `${dir}.bak`;
@@ -99,6 +148,15 @@ async function installApp(id, send) {
 
     const state = readState();
     state.apps[id] = { version, dir, exe, installedAt: new Date().toISOString() };
+    if (licensed) {
+      state.hub = { ...(state.hub || {}), licenses: { ...((state.hub || {}).licenses || {}), [id]: key } };
+      // consumed (and deleted) by the app on first start: activates the license and applies the chosen models
+      if (opts.models && opts.models.length) {
+        const f = setupFile(entry);
+        fs.mkdirSync(path.dirname(f), { recursive: true });
+        fs.writeFileSync(f, JSON.stringify({ license_key: key, model: opts.model || opts.models[0], wa_model: opts.waModel || opts.model || opts.models[0], embed: entry.ollama && entry.ollama.embed }));
+      }
+    }
     writeState(state);
     if (hadOld) fs.rm(backup, { recursive: true, force: true }, () => {});
     return state;
@@ -164,7 +222,10 @@ async function checkUpdates() {
   const result = {};
   await Promise.all(Object.entries(state.apps).map(async ([id, info]) => {
     try {
-      const { version } = await latestRelease(findApp(id).repo);
+      const e = findApp(id);
+      const { version } = e.license === 'required'
+        ? await licensing.fetchRelease(licenseUrl(e), savedKey(id), true)
+        : await latestRelease(e.repo);
       result[id] = { latest: version, hasUpdate: isNewer(version, info.version) };
     } catch {
       result[id] = { latest: null, hasUpdate: false };
@@ -280,6 +341,13 @@ function initAutostart() {
   if (!app.isPackaged) return;
   const state = readState();
   if (!state.hub) state.hub = {};
+  // The Run entry is keyed by app name, so a copy started from somewhere else (win-unpacked, an old folder) can own it. Whichever
+  // copy registered last wins at login, which made an old build start every day and ask for the same update again.
+  // If an entry exists but points to another exe, the running one takes it over.
+  const mine = (app.getLoginItemSettings().launchItems || []).filter((i) => /(^|\.)sentinel hub$/i.test(i.name));
+  if (mine.length && mine.some((i) => path.resolve(i.path).toLowerCase() !== process.execPath.toLowerCase())) {
+    app.setLoginItemSettings({ openAtLogin: true, args: LOGIN_ARGS });
+  }
   if (!state.hub.autostartInit) {
     app.setLoginItemSettings({ openAtLogin: true, args: LOGIN_ARGS });
     state.hub.autostartInit = true;
@@ -363,7 +431,13 @@ app.whenReady().then(() => {
   ipcMain.handle('state:get', async () => withStartup(pruneState(readState())));
   ipcMain.handle('updates:check', () => checkUpdates());
 
-  ipcMain.handle('app:install', reply(async (id) => ({ state: await withStartup(await installApp(id, send)) })));
+  ipcMain.handle('app:install', reply(async (id, opts) => ({ state: await withStartup(await installApp(id, send, opts || {})) })));
+  // Install dialog data for licensed apps: hardware, Ollama status, which catalog models are already on disk.
+  ipcMain.handle('app:plan', reply(async (id) => {
+    const e = findApp(id);
+    const [hw, up, have] = await Promise.all([ollama.hardware(), ollama.running(), ollama.installedModels()]);
+    return { plan: { key: savedKey(id), hw, ollamaRunning: up, have, ollama: e.ollama || null } };
+  }));
   // The Hub carries the install/update logic for every app, so a newer Hub must come first.
   ipcMain.handle('app:update', reply(async (id) => {
     if ((await checkHubUpdate()).hasUpdate) throw new Error('HUB_UPDATE_FIRST');
