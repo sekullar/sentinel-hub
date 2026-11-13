@@ -21,7 +21,9 @@ let current = null;
 
 function loadCatalog() {
   if (current) return current;
-  for (const file of [cacheFile(), bundledFile]) {
+  // Developer test mode (SENTINEL_HUB_LOCAL set): the catalog in this folder wins over the cached/remote one.
+  const order = (process.env.SENTINEL_HUB_LOCAL && !app.isPackaged) ? [bundledFile] : [cacheFile(), bundledFile];
+  for (const file of order) {
     try {
       const catalog = readJson(file);
       if (isValid(catalog)) {
@@ -34,6 +36,7 @@ function loadCatalog() {
 }
 
 async function refreshCatalog() {
+  if (process.env.SENTINEL_HUB_LOCAL && !app.isPackaged) return loadCatalog();   // test mode: do not overwrite with the remote copy
   try {
     const res = await fetch(REMOTE_URL, { headers: { 'User-Agent': 'SentinelHub' }, signal: AbortSignal.timeout(5000) });
     if (res.ok) {

@@ -28,7 +28,13 @@ async function installedModels() {
 
 function exePath() {
   const p = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Ollama', 'ollama.exe');
-  return fs.existsSync(p) ? p : null;
+  if (fs.existsSync(p)) return p;
+  // installed somewhere else (custom folder, package manager): look on PATH so it is not downloaded again
+  for (const dir of String(process.env.PATH || '').split(path.delimiter)) {
+    const q = dir && path.join(dir.replace(/^"|"$/g, ''), 'ollama.exe');
+    if (q && fs.existsSync(q)) return q;
+  }
+  return null;
 }
 
 function vramGB() {

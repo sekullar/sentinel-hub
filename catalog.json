@@ -68,11 +68,55 @@
       "id": "sentinel",
       "name": "Sentinel",
       "description": {
-        "tr": "Python tabanlı asistan: GUI, WhatsApp, Gmail.",
-        "en": "Python-based assistant: GUI, WhatsApp, Gmail."
+        "tr": "Kendi bilgisayarında çalışan yapay zeka asistanı: sohbet, tarayıcı görevleri, Photoshop, WhatsApp, Gmail.",
+        "en": "An AI assistant that runs on your own PC: chat, browser tasks, Photoshop, WhatsApp, Gmail."
       },
       "repo": "sekullar/sentinel",
-      "stack": "python"
+      "stack": "electron",
+      "dataDir": "Sentinel",
+      "ollama": {
+        "embed": "bge-m3",
+        "embedGB": 1.2,
+        "models": [
+          {
+            "id": "qwen3:8b",
+            "sizeGB": 5.23,
+            "minRamGB": 16,
+            "minVramGB": 6
+          },
+          {
+            "id": "qwen3:14b",
+            "sizeGB": 9.28,
+            "minRamGB": 32,
+            "minVramGB": 12
+          },
+          {
+            "id": "gpt-oss:20b",
+            "sizeGB": 14,
+            "minRamGB": 24,
+            "minVramGB": 0
+          },
+          {
+            "id": "qwen3-coder:30b",
+            "sizeGB": 19,
+            "minRamGB": 20,
+            "minVramGB": 0
+          }
+        ],
+        "defaultMain": "qwen3-coder:30b",
+        "recommend": "qwen3-coder:30b",
+        "extras": [
+          {
+            "id": "gemma3:12b",
+            "sizeGB": 8.16,
+            "role": "vision",
+            "label": {
+              "tr": "Görsel kontrol modeli: Photoshop tasarımlarına bakıp hataları yakalar (isteğe bağlı)",
+              "en": "Vision check model: looks at Photoshop designs and catches mistakes (optional)"
+            }
+          }
+        ]
+      }
     },
     {
       "id": "sentinel-business",

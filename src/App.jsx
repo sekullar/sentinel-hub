@@ -54,7 +54,8 @@ function AppCard({ app, index, t, lang, ctl }) {
       </>
     );
   } else {
-    action = <button className="btn" onClick={() => (locked ? ctl.askInstall(app) : ctl.install(app.id))}>{locked ? t.installLicensed : t.install}</button>;
+    // apps that need Ollama models open the dialog first (pick models; licensed ones also ask for the key)
+    action = <button className="btn" onClick={() => (locked || app.ollama ? ctl.askInstall(app) : ctl.install(app.id))}>{locked ? t.installLicensed : t.install}</button>;
   }
 
   return (
@@ -109,8 +110,11 @@ function ModelPicker({ title, list, value, setValue, custom, setCustom, recommen
   );
 }
 
-function InstallDialog({ app, plan, t, onClose, onGo }) {
+function InstallDialog({ app, plan, t, lang, onClose, onGo }) {
   const o = plan.ollama;
+  const licensed = app.license === 'required';
+  const extras = (o && o.extras) || [];
+  const [extraOn, setExtraOn] = useState(() => Object.fromEntries(extras.map((x) => [x.id, plan.have.includes(x.id)])));
   const { ramGB, vramGB } = plan.hw;
   const fits = (m) => ramGB >= m.minRamGB && vramGB >= m.minVramGB;
   const bySize = o ? [...o.models].sort((a, b) => a.sizeGB - b.sizeGB) : [];
@@ -127,31 +131,57 @@ function InstallDialog({ app, plan, t, onClose, onGo }) {
   const have = (m) => plan.have.includes(m);
   const mainName = mainSel === CUSTOM ? mainCustom : mainSel;
   const waName = waSel === CUSTOM ? waCustom : waSel;
-  const namesOk = [mainName, waName].every((n) => MODEL_RE.test(n || ''));
-  const size = (n) => (o.models.find((m) => m.id === n) || { sizeGB: 0 }).sizeGB;
-  const pulls = o && !skip ? [...new Set([mainName, waName])] : [];
+  const namesOk = [mainName, ...(o && o.defaultWa ? [waName] : [])].every((n) => MODEL_RE.test(n || ''));
+  const size = (n) => ([...o.models, ...((o && o.extras) || [])].find((m) => m.id === n) || { sizeGB: 0 }).sizeGB;
+  const hasWa = !!(o && o.defaultWa);
+  const chosenExtras = o && !skip ? extras.filter((x) => extraOn[x.id]) : [];
+  const pulls = o && !skip ? [...new Set([mainName, ...(hasWa ? [waName] : []), ...chosenExtras.map((x) => x.id)])] : [];
   const need = pulls.reduce((sum, n) => sum + (have(n) ? 0 : size(n)), 0) + (o && !skip && !have(o.embed) ? o.embedGB : 0);
-  const unknownSize = pulls.some((n) => !have(n) && !o.models.some((m) => m.id === n));
-  const keyOk = /^[A-Za-z0-9]{2,4}(-[A-Za-z0-9]{4}){2,4}$/.test(key.trim());
-  const go = () => onGo({ key: key.trim(), model: skip ? undefined : mainName, waModel: skip ? undefined : waName, models: o && !skip ? [...pulls, o.embed] : [] });
+  const unknownSize = pulls.some((n) => !have(n) && size(n) === 0);
+  const keyOk = !licensed || /^[A-Za-z0-9]{2,4}(-[A-Za-z0-9]{4}){2,4}$/.test(key.trim());
+  const vision = chosenExtras.find((x) => x.role === 'vision');
+  const go = () => onGo({
+    ...(licensed ? { key: key.trim() } : {}),
+    model: skip ? undefined : mainName, waModel: skip || !hasWa ? undefined : waName,
+    vision: vision ? vision.id : undefined, models: o && !skip ? [...pulls, o.embed] : [],
+  });
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal wide">
         <div className="modal-head">
           <div className="icon small"><AppIcon id={app.id} name={app.name} /></div>
-          <div><h2>{app.name}</h2><p>{t.licenseNeeded}</p></div>
+          <div><h2>{app.name}</h2><p>{licensed ? t.licenseNeeded : t.modelsIntro}</p></div>
         </div>
-        <label className="field">
-          <span>{t.licenseKey}</span>
-          <input value={key} placeholder="SB-XXXX-XXXX-XXXX" spellCheck="false" autoFocus onChange={(e) => setKey(e.target.value)} />
-        </label>
+        {licensed && (
+          <label className="field">
+            <span>{t.licenseKey}</span>
+            <input value={key} placeholder="SB-XXXX-XXXX-XXXX" spellCheck="false" autoFocus onChange={(e) => setKey(e.target.value)} />
+          </label>
+        )}
         {o && (
           <>
             <small className="muted">{t.pickModel} · {t.hwLine.replace('{ram}', ramGB).replace('{vram}', vramGB ? `${vramGB} GB` : t.noGpu)}</small>
             <ModelPicker title={t.mainModel} list={bySize} value={mainSel} setValue={setMainSel} custom={mainCustom} setCustom={setMainCustom}
-              recommendedId={defMain} fits={fits} have={have} disabled={skip} t={t} />
-            <ModelPicker title={t.waModel} list={bySize} value={waSel} setValue={setWaSel} custom={waCustom} setCustom={setWaCustom}
-              recommendedId={defWa} fits={fits} have={have} disabled={skip} t={t} />
+              recommendedId={o.recommend || defMain} fits={fits} have={have} disabled={skip} t={t} />
+            {hasWa && (
+              <ModelPicker title={t.waModel} list={bySize} value={waSel} setValue={setWaSel} custom={waCustom} setCustom={setWaCustom}
+                recommendedId={defWa} fits={fits} have={have} disabled={skip} t={t} />
+            )}
+            {extras.length > 0 && (
+              <div className="field">
+                <span>{t.extraModels}</span>
+                <div className="models">
+                  {extras.map((x) => (
+                    <label key={x.id} className={`model${extraOn[x.id] && !skip ? ' on' : ''}${skip ? ' off' : ''}`}>
+                      <input type="checkbox" disabled={skip} checked={!!extraOn[x.id]} onChange={(e) => setExtraOn((v) => ({ ...v, [x.id]: e.target.checked }))} />
+                      <b>{x.id}</b>
+                      <span>{x.sizeGB} GB{have(x.id) ? ` · ${t.alreadyHave}` : ''}</span>
+                      <small className="muted extra-desc">{(x.label && (x.label[lang] || x.label.en)) || ''}</small>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="field">
               <small className="muted">{t.embedLine.replace('{m}', o.embed).replace('{gb}', o.embedGB)}{have(o.embed) ? ` · ${t.alreadyHave}` : ''}</small>
               <label className="inline"><input type="checkbox" checked={skip} onChange={(e) => setSkip(e.target.checked)} /> {t.skipModels}</label>
@@ -528,6 +558,7 @@ export default function App() {
           app={dlg.app}
           plan={dlg.plan}
           t={t}
+          lang={lang}
           onClose={() => setDlg(null)}
           onGo={(opts) => { const id = dlg.app.id; setDlg(null); ctl.install(id, opts); }}
         />

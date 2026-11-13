@@ -177,3 +177,5 @@ body { overflow: hidden; }
 
 .model .model-name { margin-left: auto; width: 55%; background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; color: inherit; font: inherit; font-size: 12px; }
 .warn-text { color: #ffb44d; }
+.model .extra-desc { flex-basis: 100%; margin-left: 26px; }
+.model:has(.extra-desc) { flex-wrap: wrap; row-gap: 2px; }

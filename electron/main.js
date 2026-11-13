@@ -86,7 +86,22 @@ function setupFile(entry) {
   return path.join(process.env.LOCALAPPDATA || app.getPath('appData'), ...dir.split(/[\\/]/), 'setup.json');
 }
 
-// opts (licensed apps): { key, models: [name...], model } — key from the dialog, otherwise the saved one.
+// Testing an installer before it is released: SENTINEL_HUB_LOCAL="sentinel=C:\path\Sentinel Setup 0.2.0.exe;other=..."
+// (developer machines only; the variable is never set by the Hub itself).
+function localInstaller(id) {
+  if (app.isPackaged) return null;   // developer override: never honoured in the installed Hub
+  for (const pair of (process.env.SENTINEL_HUB_LOCAL || '').split(';')) {
+    const i = pair.indexOf('=');
+    if (i < 1 || pair.slice(0, i).trim() !== id) continue;
+    const file = pair.slice(i + 1).trim();
+    if (!/\.exe$/i.test(file) || !fs.existsSync(file)) return null;
+    const m = path.basename(file).match(/(\d+\.\d+\.\d+)/);
+    return { version: m ? m[1] : '0.0.0', url: require('url').pathToFileURL(file).href, name: path.basename(file) };
+  }
+  return null;
+}
+
+// opts: { key (licensed apps), models: [name...], model, waModel, vision } — key from the dialog, otherwise the saved one.
 async function installApp(id, send, opts = {}) {
   const entry = findApp(id);
   const licensed = entry.license === 'required';
@@ -94,10 +109,12 @@ async function installApp(id, send, opts = {}) {
   if (licensed && !key) throw new Error('LICENSE_REQUIRED');
 
   send({ id, stage: 'fetching' });
-  let version, url, name, sha256 = null;
+  let version, url, name, local, sha256 = null;
   if (licensed) {
     const rel = await licensing.fetchRelease(licenseUrl(entry), key, false);
     ({ version, url, name, sha256 } = rel);
+  } else if ((local = localInstaller(id))) {
+    ({ version, url, name } = local);
   } else {
     const r = await latestRelease(entry.repo);
     ({ version } = r);
@@ -107,15 +124,17 @@ async function installApp(id, send, opts = {}) {
 
   // Ollama + models first: the app is useless without them, and a failure here must not leave a half-installed app.
   // only models the catalog offers (the renderer is not trusted to name arbitrary pulls)
-  if (licensed && entry.ollama && opts.models) {
+  if (entry.ollama && opts.models) {
     // catalog models plus free-typed Ollama names (strict pattern: only registry-style names, never a path or URL)
-    const ok = new Set([entry.ollama.embed, ...entry.ollama.models.map((m) => m.id)]);
+    const ok = new Set([entry.ollama.embed, ...entry.ollama.models.map((m) => m.id), ...(entry.ollama.extras || []).map((m) => m.id)]);
     const allowed = (m) => typeof m === 'string' && (ok.has(m) || MODEL_RE.test(m));
     opts = { ...opts, models: [...new Set(opts.models.filter(allowed))] };
     if (!allowed(opts.model) || !opts.models.includes(opts.model)) opts.model = undefined;
     if (!allowed(opts.waModel) || !opts.models.includes(opts.waModel)) opts.waModel = undefined;
+    if (!allowed(opts.vision) || !opts.models.includes(opts.vision)) opts.vision = undefined;
   }
-  if (licensed && entry.ollama && opts.models && opts.models.length) {
+  // Ollama and every chosen model are skipped when already there (ensure/installedModels).
+  if (entry.ollama && opts.models && opts.models.length) {
     await ollama.ensure((p) => send({ id, ...p }), app.getPath('temp'));
     const have = await ollama.installedModels();
     for (const m of opts.models.filter((m) => !have.includes(m))) {
@@ -126,7 +145,8 @@ async function installApp(id, send, opts = {}) {
 
   const installer = path.join(app.getPath('temp'), `SentinelHub-${id}-${name}`);
   send({ id, stage: 'downloading', percent: 0 });
-  await download(url, installer, (percent) => send({ id, stage: 'downloading', percent }));
+  if (url.startsWith('file:')) fs.copyFileSync(new URL(url), installer);
+  else await download(url, installer, (percent) => send({ id, stage: 'downloading', percent }));
   if (sha256) {
     const got = crypto.createHash('sha256').update(fs.readFileSync(installer)).digest('hex');
     if (got !== sha256.toLowerCase()) { fs.rmSync(installer, { force: true }); throw new Error('CHECKSUM'); }
@@ -156,6 +176,11 @@ async function installApp(id, send, opts = {}) {
         fs.mkdirSync(path.dirname(f), { recursive: true });
         fs.writeFileSync(f, JSON.stringify({ license_key: key, model: opts.model || opts.models[0], wa_model: opts.waModel || opts.model || opts.models[0], embed: entry.ollama && entry.ollama.embed }));
       }
+    } else if (entry.ollama && opts.models && opts.models.length) {
+      // free apps read this on every start (not consumed); it only names the models picked in the dialog
+      const f = setupFile(entry);
+      fs.mkdirSync(path.dirname(f), { recursive: true });
+      fs.writeFileSync(f, JSON.stringify({ model: opts.model || opts.models[0], embed: entry.ollama.embed, ...(opts.vision ? { vision: opts.vision } : {}) }, null, 2));
     }
     writeState(state);
     if (hadOld) fs.rm(backup, { recursive: true, force: true }, () => {});
