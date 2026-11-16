@@ -65,6 +65,16 @@
       "stack": "electron"
     },
     {
+      "id": "compade",
+      "name": "Compade",
+      "description": {
+        "tr": "Yapay zeka kodlama ekibi: Claude Code şef olur, işi Codex, OpenCode ve Antigravity'ye dağıtır, sonucu test edip sana onaylatır.",
+        "en": "An AI coding team: Claude Code acts as the chief, hands the work to Codex, OpenCode and Antigravity, tests the result and asks you to approve it."
+      },
+      "repo": "sekullar/compade",
+      "stack": "python"
+    },
+    {
       "id": "sentinel",
       "name": "Sentinel",
       "description": {

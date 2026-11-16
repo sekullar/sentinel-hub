@@ -30,6 +30,7 @@ launch them from one place. Windows, built with Electron + React. [Türkçe READ
 | Phoneix | [sekullar/phoneix](https://github.com/sekullar/phoneix) |
 | Pyramid | [sekullar/pyramid](https://github.com/sekullar/pyramid) |
 | AIDA | [sekullar/aida](https://github.com/sekullar/aida) |
+| Compade | [sekullar/compade](https://github.com/sekullar/compade) |
 | Sentinel | coming soon |
 | Sentinel Business | licensed (coming soon) |
 
