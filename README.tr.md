@@ -32,6 +32,7 @@ başlat. Windows için, Electron + React ile yapıldı. [English README](README.
 | Pyramid | [sekullar/pyramid](https://github.com/sekullar/pyramid) |
 | AIDA | [sekullar/aida](https://github.com/sekullar/aida) |
 | Compade | [sekullar/compade](https://github.com/sekullar/compade) |
+| VR Monitor | [sekullar/vr-monitor](https://github.com/sekullar/vr-monitor) |
 | Sentinel | yakında |
 | Sentinel Business | lisanslı (yakında) |
 

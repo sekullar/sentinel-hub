@@ -31,6 +31,7 @@ launch them from one place. Windows, built with Electron + React. [Türkçe READ
 | Pyramid | [sekullar/pyramid](https://github.com/sekullar/pyramid) |
 | AIDA | [sekullar/aida](https://github.com/sekullar/aida) |
 | Compade | [sekullar/compade](https://github.com/sekullar/compade) |
+| VR Monitor | [sekullar/vr-monitor](https://github.com/sekullar/vr-monitor) |
 | Sentinel | coming soon |
 | Sentinel Business | licensed (coming soon) |
 

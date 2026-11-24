@@ -75,6 +75,23 @@
       "stack": "python"
     },
     {
+      "id": "vr-monitor",
+      "name": "VR Monitor",
+      "description": {
+        "tr": "Telefonu VR gözlükte sanal monitöre çevirir: PC ekranlarını USB/Wi-Fi ile yayınlar, el takibi ve DualShock desteği.",
+        "en": "Turns a phone in a VR headset into virtual monitors for your PC: streams screens over USB/Wi-Fi, with hand tracking and DualShock support."
+      },
+      "repo": "sekullar/vr-monitor",
+      "stack": "python",
+      "extra": {
+        "label": {
+          "tr": "Telefon uygulamasını indir (APK)",
+          "en": "Download the phone app (APK)"
+        },
+        "url": "https://github.com/sekullar/vr-monitor/releases/latest/download/VRMonitor.apk"
+      }
+    },
+    {
       "id": "sentinel",
       "name": "Sentinel",
       "description": {
