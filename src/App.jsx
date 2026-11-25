@@ -59,12 +59,18 @@ function AppCard({ app, index, t, lang, ctl }) {
   }
 
   return (
-    <div className="card" style={{ animationDelay: `${index * 70}ms` }}>
+    <div className={`card${app.deprecated ? ' deprecated' : ''}`} style={{ animationDelay: `${index * 70}ms` }}>
       <div className="icon"><AppIcon id={app.id} name={app.name} /></div>
       <div className="info">
-        <h2>{app.name}{info && <small>{info.version}</small>}</h2>
+        <h2>{app.name}{info && <small>{info.version}</small>}{app.deprecated && <span className="dep-badge">{t.deprecated}</span>}</h2>
         <p>{app.description[lang] || app.description.en}</p>
       </div>
+      {app.deprecated && (
+        <div className="dep-note" role="note">
+          <strong><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 7.5h0" /></svg>{t.deprecatedNote}</strong>
+          <p>{app.deprecated[lang] || app.deprecated.en}</p>
+        </div>
+      )}
       {app.extra && (
         <button className="extra-link" onClick={() => window.hub.openExtra(app.id)}>
           <svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></svg>

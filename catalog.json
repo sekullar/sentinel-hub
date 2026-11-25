@@ -72,7 +72,11 @@
         "en": "An AI coding team: Claude Code acts as the chief, hands the work to Codex, OpenCode and Antigravity, tests the result and asks you to approve it."
       },
       "repo": "sekullar/compade",
-      "stack": "python"
+      "stack": "python",
+      "deprecated": {
+        "tr": "Bu programı ilham alarak geliştirdik ancak istediğimiz verimi bir türlü alamadık. Silmeye kıyamadığımız için açık kaynak olarak bırakıyor ve geliştirmeyi bırakıyoruz.",
+        "en": "We built this program taking inspiration from other tools, but we never got the efficiency we were after. Since we couldn't bring ourselves to delete it, we are leaving it open source and ending development."
+      }
     },
     {
       "id": "vr-monitor",
